@@ -1,0 +1,6 @@
+# Testes locais e de CI (não exige conta GCP).
+pandas>=2.2
+numpy>=1.26
+pytest>=8
+python-hcl2>=4
+pyyaml>=6

@@ -1,0 +1,7 @@
+# Harness de validação dos modelos dbt em DuckDB (tests/validate_models_duckdb.py).
+# Use um ambiente separado do dbt-bigquery.
+dbt-duckdb>=1.9
+duckdb>=1.1
+pandas>=2.2
+numpy>=1.26
+pyyaml>=6

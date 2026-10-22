@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Landing no BigQuery: tudo STRING, com _src_row, _src_file e _loaded_at.
+      Alimentado por ingestion/load_bigquery.py (idempotente por partição).
+    schema: raw
+    tables:
+      - name: inf_diario
+        description: Informe diário, particionado por mês de arquivo (_src_month).
+        config:
+          loaded_at_field: _loaded_at
+          freshness:
+            warn_after: {count: 36, period: hour}
+            error_after: {count: 96, period: hour}   # 96h cobre um fim de semana com feriado
+      - name: cad_fi
+        description: Cadastro de fundos, um snapshot por dia (_src_snapshot).
+        config:
+          loaded_at_field: _loaded_at
+          freshness:
+            warn_after: {count: 48, period: hour}
+            error_after: {count: 120, period: hour}

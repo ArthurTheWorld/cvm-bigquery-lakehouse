@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: stg_inf_diario
+    description: >
+      Informe diário tipado e deduplicado (incremental, insert_overwrite por dia).
+      Convivem dois schemas no raw (CNPJ_FUNDO antigo e CNPJ_FUNDO_CLASSE novo).
+    columns:
+      - name: informe_sk
+        data_tests: [unique, not_null]
+      - name: fundo_cnpj
+        data_tests: [not_null]
+      - name: dt_comptc
+        data_tests: [not_null]
+      - name: vl_quota
+        description: BIGNUMERIC no BigQuery (12 casas); NUMERIC truncaria.
+        data_tests: [not_null]
+      - name: vl_patrim_liq
+        data_tests: [not_null]
+
+  - name: stg_cad_fi
+    description: >
+      Último snapshot do cadastro, uma linha por fundo. CPF de gestor PF vira hash
+      (gestor_chave) e o diretor responsável é descartado (LGPD: minimização).
+    columns:
+      - name: fundo_cnpj
+        data_tests: [unique, not_null]
+      - name: situacao
+        data_tests: [not_null]
+      - name: gestor_tipo
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [PF, PJ]
+              config:
+                severity: warn
+      - name: gestor_chave
+        data_tests: [not_null]

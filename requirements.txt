@@ -1,0 +1,6 @@
+# Operar o pipeline de verdade (GCP).
+dbt-bigquery>=1.9
+google-cloud-bigquery>=3.25
+google-cloud-storage>=2.18
+requests>=2.32
+pandas>=2.2

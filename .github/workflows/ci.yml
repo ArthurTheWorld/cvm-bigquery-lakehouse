@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python-tests:
+    name: Testes (ingestão, carregador BigQuery, DAG, Terraform, trava do CI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  dbt-parse:
+    name: dbt parse (adaptador BigQuery, sem conexão)
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: projeto-ficticio   # parse não conecta; só satisfaz o env_var() do profile
+      DBT_PROFILES_DIR: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install dbt-bigquery
+      - run: dbt parse
+        working-directory: dbt_project
+
+  validate-models:
+    name: Lógica dos modelos dbt em DuckDB (incremental, reapresentação, mudança de schema, LGPD)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-harness.txt
+      - run: python tests/validate_models_duckdb.py --funds 200 --months 6
+      - name: Controle negativo (o teste tem de DETECTAR o filtro incremental ingênuo)
+        run: python tests/validate_models_duckdb.py --funds 200 --months 6 --negative-control
+
+  terraform:
+    name: Terraform fmt + validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+        working-directory: infra/terraform
+      - run: terraform init -backend=false
+        working-directory: infra/terraform
+      - run: terraform validate
+        working-directory: infra/terraform
+
+  dbt-build-on-bigquery:
+    name: dbt build em datasets efêmeros do BigQuery
+    # Fora de pull requests e SÓ se o secret existir (forks e repositórios sem GCP simplesmente pulam).
+    if: github.event_name != 'pull_request'
+    needs: [python-tests, dbt-parse, validate-models]
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+      DBT_PROFILES_DIR: .
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa-key.json
+    steps:
+      - name: Verificar secrets
+        id: secrets
+        env:
+          KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -z "$GCP_PROJECT" ] || [ -z "$KEY" ]; then
+            echo "Sem secrets do GCP: job ignorado."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.enabled == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.secrets.outputs.enabled == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar e autenticar
+        if: steps.secrets.outputs.enabled == 'true'
+        env:
+          KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          pip install dbt-bigquery google-cloud-bigquery
+          printf '%s' "$KEY" > "$GOOGLE_APPLICATION_CREDENTIALS"
+      - name: dbt build em datasets dbt_ci_<run_id>_*
+        if: steps.secrets.outputs.enabled == 'true'
+        run: |
+          dbt build --target ci --vars '{schema_prefix: "dbt_ci_${{ github.run_id }}_"}'
+        working-directory: dbt_project
+      - name: Derrubar datasets efêmeros (sempre)
+        if: always() && steps.secrets.outputs.enabled == 'true'
+        run: python ci/bq_cleanup.py "dbt_ci_${{ github.run_id }}_"
+      - name: Remover a chave
+        if: always()
+        run: rm -f "$GOOGLE_APPLICATION_CREDENTIALS"

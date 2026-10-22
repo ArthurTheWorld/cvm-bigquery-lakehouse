@@ -1,0 +1,26 @@
+name: 'cvm_fundos'
+version: '1.0.0'
+config-version: 2
+profile: 'cvm_fundos'
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Janela de segurança do incremental: o filtro por _loaded_at reprocessa as
+  # últimas N horas além do máximo já visto (ver macros/incremental_filter.sql).
+  incremental_lookback_hours: 6
+  # Prefixo dos datasets (usado pelo CI: dbt_ci_<run_id>_). Vazio em dev/prod.
+  schema_prefix: ""
+
+models:
+  cvm_fundos:
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table

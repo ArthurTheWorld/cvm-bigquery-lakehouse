@@ -1,0 +1,27 @@
+# Nenhuma credencial aqui: projeto e chave vêm de variáveis de ambiente.
+cvm_fundos:
+  target: dev
+  outputs:
+    # Desenvolvimento local: `gcloud auth application-default login`
+    dev:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT') }}"
+      dataset: staging
+      location: "{{ env_var('BQ_LOCATION', 'southamerica-east1') }}"
+      threads: 4
+      # Trava de custo: qualquer consulta que leria mais que isso FALHA em vez de cobrar.
+      maximum_bytes_billed: 20000000000
+      job_execution_timeout_seconds: 900
+
+    # CI / Composer: conta de serviço
+    ci:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT') }}"
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', '/dev/null') }}"
+      dataset: staging
+      location: "{{ env_var('BQ_LOCATION', 'southamerica-east1') }}"
+      threads: 4
+      maximum_bytes_billed: 20000000000
+      job_execution_timeout_seconds: 900

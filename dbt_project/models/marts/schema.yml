@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: dim_fundos
+    description: >
+      Uma linha por fundo. Gestor PF aparece pseudonimizado; CPF e diretor responsável
+      não existem nesta camada.
+    columns:
+      - name: fundo_cnpj
+        data_tests: [unique, not_null]
+      - name: gestor_chave
+        data_tests: [not_null]
+      - name: gestor_nome
+        data_tests: [not_null]
+
+  - name: dim_gestoras
+    columns:
+      - name: gestor_chave
+        data_tests: [unique, not_null]
+
+  - name: fct_fundo_dia
+    description: Fundo/classe/subclasse por dia. Incremental (insert_overwrite por dia), cluster por fundo.
+    columns:
+      - name: informe_sk
+        data_tests: [unique, not_null]
+      - name: fundo_cnpj
+        data_tests: [not_null]
+      - name: dt_comptc
+        data_tests: [not_null]
+
+  - name: agg_fundo_mensal
+    columns:
+      - name: agg_sk
+        data_tests: [unique, not_null]
+
+  - name: agg_mercado_mensal
+    columns:
+      - name: classe
+        data_tests: [not_null]
+
+  - name: agg_gestora_mensal
+    columns:
+      - name: gestor_chave
+        data_tests: [not_null]
